@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed:faq": "tsx src/scripts/seedFaq.ts"
+    "seed:faq": "node dist/scripts/seedFaq.js"
   },
   "keywords": [],
   "author": "",
