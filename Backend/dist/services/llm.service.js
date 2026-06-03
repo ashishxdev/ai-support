@@ -3,13 +3,18 @@ import { GoogleGenAI } from "@google/genai";
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
-const SYSTEM_INSTRUCTION = `You are a helpful and friendly AI support agent for Spur — a customer engagement and automation platform.
+const SYSTEM_INSTRUCTION = `You are a professional and helpful AI support agent for Spur — a multi-channel AI Agent for marketing and customer support (website chat widget, Instagram comments/DMs, Facebook, WhatsApp Business API).
 
-Your behaviour rules:
+STRICT DOMAIN GUARDRAILS:
+1. You must ONLY answer questions directly related to Spur, its features, integrations, team, contact info, partner program, or the provided Knowledge Base.
+2. For any query or request that is NOT related to Spur (e.g., general knowledge, writing code/scripts, solving math, recipes, advice on unrelated topics, or other platforms), you MUST politely refuse to answer using this exact template:
+   "I am only programmed to answer questions about Spur and our customer engagement/automation platform. How can I help you with Spur today?"
+3. Friendly greetings and expressions of gratitude (e.g., "Hello", "Hi", "Thanks", "Goodbye") are allowed, but keep them brief and steer the conversation back to Spur. Do not engage in lengthy chats or discuss topics outside of Spur.
+
+Your behavior rules:
 1. ALWAYS remember and use information shared earlier in the conversation (e.g. if the user told you their name, use it).
-2. For support questions (refunds, billing, subscriptions, cancellation, account, terms), answer ONLY from the Knowledge Base provided. If it's not there, say: "I don't have that information — please reach out to support@spurnow.com."
-3. For general conversational messages (greetings, thanks, personal info the user shared), respond naturally and warmly.
-4. Keep answers concise and clear. Do not make up policies.`;
+2. For support/business questions, answer ONLY from the Knowledge Base provided. If the information is not present in the Knowledge Base, reply with: "I don't have that information — please reach out to support@spurnow.com or contact us on WhatsApp at +919599055272."
+3. Keep answers concise, clear, and professional. Do not make up policies or information.`;
 export class LlmError extends Error {
     status;
     constructor(status, message) {
@@ -45,25 +50,41 @@ export async function generateReply(faqText, historyTurns, userMessage) {
             parts: [{ text: userMessage }],
         },
     ];
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            config: { systemInstruction: SYSTEM_INSTRUCTION },
-            contents,
-        });
-        return response.text;
-    }
-    catch (err) {
-        console.error("Gemini API Error Details:", err);
-        const e = err;
-        const status = e?.status ?? 500;
-        if (status === 429) {
-            throw new LlmError(429, "The AI is receiving too many requests right now. Please wait a moment and try again.");
+    const modelsToTry = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-3.5-flash",
+    ];
+    let lastError = null;
+    for (const model of modelsToTry) {
+        try {
+            const response = await ai.models.generateContent({
+                model,
+                config: { systemInstruction: SYSTEM_INSTRUCTION },
+                contents,
+            });
+            return response.text;
         }
-        if (status === 401 || status === 403) {
-            throw new LlmError(status, "AI service authentication failed. Please check the API key configuration.");
+        catch (err) {
+            console.error(`Gemini API Error with model ${model}:`, err);
+            const e = err;
+            const status = e?.status ?? 500;
+            // Handle critical auth errors immediately
+            if (status === 401 || status === 403) {
+                throw new LlmError(status, "AI service authentication failed. Please check the API key configuration.");
+            }
+            // Record error and try the next model for rate limits (429), not found (404) or any 500 error
+            lastError = err;
+            console.warn(`Model ${model} failed with status ${status}. Retrying with next fallback model...`);
         }
-        throw new LlmError(status, "The AI service encountered an error. Please try again shortly.");
     }
+    // If we reach here, all fallback models failed
+    const e = lastError;
+    const status = e?.status ?? 500;
+    if (status === 429) {
+        throw new LlmError(429, "The AI is receiving too many requests right now. Please wait a moment and try again.");
+    }
+    throw new LlmError(status, "The AI service encountered an error. Please try again shortly.");
 }
 //# sourceMappingURL=llm.service.js.map

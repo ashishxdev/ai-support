@@ -251,7 +251,7 @@ export default function App() {
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/[0.05]">
-        <p className="text-[10px] text-slate-600">Powered by Gemini · May not always be accurate</p>
+        <p className="text-[10px] text-slate-600">Support</p>
       </div>
     </>
   );
