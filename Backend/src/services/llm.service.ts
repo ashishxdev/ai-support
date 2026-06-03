@@ -70,6 +70,7 @@ export async function generateReply(
     });
     return response.text;
   } catch (err: unknown) {
+    console.error("Gemini API Error Details:", err);
     const e = err as { status?: number; message?: string };
     const status = e?.status ?? 500;
     if (status === 429) {
