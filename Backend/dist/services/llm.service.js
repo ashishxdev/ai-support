@@ -54,6 +54,7 @@ export async function generateReply(faqText, historyTurns, userMessage) {
         return response.text;
     }
     catch (err) {
+        console.error("Gemini API Error Details:", err);
         const e = err;
         const status = e?.status ?? 500;
         if (status === 429) {
